@@ -39,19 +39,27 @@
     import { createFFmpeg, fetchFile } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.4/dist/ffmpeg.min.js';
 
     const ffmpeg = createFFmpeg({ log: false });
-    const log = document.getElementById("log");
+    const logEl = document.getElementById("log");
     const progressBar = document.getElementById("progress");
     const downloadLink = document.getElementById("downloadLink");
     const ytBtn = document.getElementById("ytBtn");
     const ttBtn = document.getElementById("ttBtn");
     let mode = "youtube";
 
-    ytBtn.onclick = () => { mode = "youtube"; ytBtn.classList.add("bg-blue-800"); ttBtn.classList.remove("bg-pink-800"); };
-    ttBtn.onclick = () => { mode = "tiktok"; ttBtn.classList.add("bg-pink-800"); ytBtn.classList.remove("bg-blue-800"); };
+    ytBtn.onclick = () => {
+      mode = "youtube";
+      ytBtn.classList.add("bg-blue-800");
+      ttBtn.classList.remove("bg-pink-800");
+    };
+    ttBtn.onclick = () => {
+      mode = "tiktok";
+      ttBtn.classList.add("bg-pink-800");
+      ytBtn.classList.remove("bg-blue-800");
+    };
 
-    function logMsg(msg) {
-      log.textContent += "\\n" + msg;
-      log.scrollTop = log.scrollHeight;
+    function log(msg) {
+      logEl.textContent += "\\n" + msg;
+      logEl.scrollTop = logEl.scrollHeight;
     }
 
     function setProgress(p) {
@@ -59,7 +67,7 @@
     }
 
     async function generateStory() {
-      logMsg("🧠 Generating story with PuterJS...");
+      log("🧠 Generating story...");
       const res = await puter.ai.chat(
         "Write a dramatic Reddit-style story in first person. 4–6 paragraphs. Emotional, intense, suspenseful.",
         { model: "gpt-4o" }
@@ -67,19 +75,20 @@
       return res.text;
     }
 
-    function makeSRT(text, addOutro) {
-      const lines = text.split(/(?<=[.?!])\s+/);
-      if (addOutro) lines.push("Full story on my channel!");
+    function makeSRT(text, outro) {
+      const lines = text.split(/(?<=[.?!])\\s+/);
+      if (outro) lines.push("Full story on my channel!");
       return lines.map((line, i) => {
-        const start = i * 3, end = start + 3;
-        const t = s => new Date(s * 1000).toISOString().substr(11, 8) + ",000";
-        return `${i + 1}\n${t(start)} --> ${t(end)}\n${line.trim()}\n\n`;
-      }).join('');
+        const start = i * 3;
+        const end = start + 3;
+        const fmt = s => new Date(s * 1000).toISOString().substr(11, 8) + ",000";
+        return `${i+1}\n${fmt(start)} --> ${fmt(end)}\n${line.trim()}\n\n`;
+      }).join("");
     }
 
     async function getTTS(text) {
       const voice = Math.random() < 0.5 ? "en_us_001" : "en_us_006";
-      logMsg(`🗣️ Using voice: ${voice}`);
+      log(`🗣️ Synthesizing with voice ${voice}...`);
       const result = await puter.ai.speak(text, { voice, format: "mp3" });
       return new Uint8Array(await result.arrayBuffer());
     }
@@ -87,24 +96,25 @@
     document.getElementById("start").onclick = async () => {
       try {
         setProgress(0);
-        log.textContent = "⏳ Starting...";
+        logEl.textContent = "⏳ Starting...";
         downloadLink.classList.add("hidden");
 
         if (!ffmpeg.isLoaded()) {
-          logMsg("📦 Loading ffmpeg...");
+          log("📦 Loading ffmpeg...");
           await ffmpeg.load();
         }
-
         setProgress(0.1);
+
         const story = await generateStory();
         setProgress(0.2);
 
-        const audio = await getTTS(story);
-        ffmpeg.FS("writeFile", "voice.mp3", audio);
+        const audioData = await getTTS(story);
+        ffmpeg.FS("writeFile", "voice.mp3", audioData);
         setProgress(0.4);
 
-        const bg = await fetchFile("bg.mp4");
-        ffmpeg.FS("writeFile", "bg.mp4", bg);
+        log("📥 Fetching background video...");
+        const bgData = await fetchFile("https://cdn.glitch.me/7accf8cb-6816-47a0-b6c6-65b7f75da309/bg.mp4?v=1751496059656");
+        ffmpeg.FS("writeFile", "bg.mp4", bgData);
         setProgress(0.5);
 
         const srt = makeSRT(story, mode === "tiktok");
@@ -112,25 +122,23 @@
         setProgress(0.6);
 
         const vf = mode === "tiktok" ? "scale=720:1280" : "scale=1280:720";
-        logMsg("🎞️ Rendering video...");
-
+        log("🎞️ Rendering video...");
         await ffmpeg.run(
           "-i", "bg.mp4",
           "-i", "voice.mp3",
           "-vf", `${vf},subtitles=subs.srt:force_style='FontSize=24,PrimaryColour=&HFFFFFF&'`,
-          "-shortest",
-          "out.mp4"
+          "-shortest", "out.mp4"
         );
-
         setProgress(1);
-        const out = ffmpeg.FS("readFile", "out.mp4");
-        const blob = new Blob([out.buffer], { type: "video/mp4" });
+
+        log("✅ Render complete!");
+        const data = ffmpeg.FS("readFile", "out.mp4");
+        const blob = new Blob([data.buffer], { type: "video/mp4" });
         downloadLink.href = URL.createObjectURL(blob);
         downloadLink.classList.remove("hidden");
-        logMsg("✅ Video complete!");
-      } catch (err) {
-        logMsg("❌ Error: " + err.message);
-        console.error(err);
+      } catch (e) {
+        log("❌ " + e.message);
+        console.error(e);
       }
     };
   </script>
