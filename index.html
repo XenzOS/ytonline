@@ -2,159 +2,67 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Minecraft Parkour AI Story</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>AI Singing Song Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/puter@latest/dist/browser.js"></script>
   <style>
-    .background-video {
-      position: fixed;
-      right: 0;
-      bottom: 0;
-      min-width: 100%;
-      min-height: 100%;
-      z-index: -1;
-      object-fit: cover;
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      margin: 10px 5px;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      font-size: 1em;
     }
   </style>
 </head>
-<body class="flex items-center justify-center min-h-screen text-white relative">
+<body>
+  <h1>🎤 AI Song Generator</h1>
+  <button onclick="generateLyrics()">✍️ Auto-Write Lyrics</button>
+  <button onclick="submitToMelobytes()">🎶 Sing with AI</button>
+  <textarea id="lyrics" placeholder="AI-generated lyrics appear here..."></textarea>
 
-  <!-- Background Video -->
-  <video autoplay muted loop class="background-video">
-    <source src="https://cdn.glitch.me/7accf8cb-6816-47a0-b6c6-65b7f75da309/bg.mp4?v=1751496059656" type="video/mp4" />
-  </video>
+  <!-- Hidden form to submit to Melobytes -->
+  <form id="melobytesForm" action="https://melobytes.com/en/app/sing" method="POST" target="_blank" style="display:none;">
+    <input type="hidden" name="voice" value="Joanna (en-US)">
+    <input type="hidden" name="text" id="melobytesText" />
+    <input type="submit" />
+  </form>
 
-  <!-- Main UI -->
-  <div class="bg-black/70 rounded-2xl p-6 w-full max-w-xl shadow-2xl backdrop-blur-md z-10">
-    <h1 class="text-3xl font-bold mb-4 text-center">Minecraft Parkour AI Story</h1>
-    <p class="text-center text-gray-300 mb-2">Enter a Reddit-style story prompt or choose a suggestion:</p>
-
-    <!-- Suggestions -->
-    <div class="flex flex-wrap gap-2 justify-center mb-4">
-      <button class="suggestion px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-full text-sm">r/NoSleep: My Minecraft world is haunted</button>
-      <button class="suggestion px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-full text-sm">r/AmItheAsshole: I refused to go to my sister's wedding</button>
-      <button class="suggestion px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-full text-sm">r/AskReddit: What's the creepiest thing you've seen?</button>
-    </div>
-
-    <!-- Prompt Input -->
-    <input id="userInput" type="text" placeholder="Type your story idea..." class="w-full p-3 mb-4 rounded-lg bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-
-    <!-- Buttons -->
-    <div class="flex flex-col sm:flex-row gap-2 mb-2">
-      <button id="generateBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Generate Story</button>
-      <select id="voiceSelect" class="bg-gray-800 text-white p-2 rounded-lg">
-        <option value="coqui">🎙 Coqui (Offline)</option>
-        <option value="elevenlabs">🧪 ElevenLabs-style (Online)</option>
-      </select>
-    </div>
-
-    <!-- Response Display -->
-    <div id="responseContainer" class="mt-4 p-4 bg-gray-900 rounded-lg whitespace-pre-wrap text-gray-100 hidden max-h-[300px] overflow-auto"></div>
-
-    <!-- Audio Player -->
-    <div class="mt-4 hidden" id="audioSection">
-      <audio id="audioPlayer" controls class="w-full mt-2"></audio>
-      <a id="downloadLink" href="#" download="story.mp3" class="text-sm text-blue-400 underline mt-1 inline-block">Download MP3</a>
-    </div>
-  </div>
-
-  <!-- Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/puterjs@latest/dist/puter.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@coqui-ai/tts-client@latest/dist/tts.min.js"></script>
-
-  <!-- Voice Logic -->
   <script>
-    const input = document.getElementById('userInput');
-    const genBtn = document.getElementById('generateBtn');
-    const output = document.getElementById('responseContainer');
-    const suggestions = document.querySelectorAll('.suggestion');
-    const audioPlayer = document.getElementById('audioPlayer');
-    const audioSection = document.getElementById('audioSection');
-    const downloadLink = document.getElementById('downloadLink');
-    const voiceSelect = document.getElementById('voiceSelect');
-    const client = new Puter.Client();
+    const puter = new Puter();
 
-    let lastResponse = '';
+    async function generateLyrics() {
+      const textarea = document.getElementById("lyrics");
+      textarea.value = "Generating lyrics...";
 
-    // Suggestion Click
-    suggestions.forEach(btn => {
-      btn.addEventListener('click', () => {
-        input.value = btn.textContent;
-      });
-    });
-
-    // ElevenLabs-style proxy (unofficial)
-    async function ttsElevenLabs(text) {
-      const url = "https://api.fakeyou.com/tts/inference"; // Example or your own proxy
-      const voice = "TM:en_us_001"; // generic US voice
-      const body = {
-        text,
-        voice: voice
-      };
-
-      const res = await fetch("https://api.voicerss.org/?key=demo&hl=en-us&src=" + encodeURIComponent(text));
-      if (!res.ok) throw new Error("TTS failed.");
-      return res.blob();
-    }
-
-    // Coqui in-browser
-    async function ttsCoqui(text) {
-      const audio = await TTS.tts({
-        text: text,
-        voice: 'en_US-amy-low', // change to another if needed
-      });
-      return audio.blob;
-    }
-
-    async function speak(text) {
-      const engine = voiceSelect.value;
-      let audioBlob;
       try {
-        if (engine === "coqui") {
-          audioBlob = await ttsCoqui(text);
-        } else {
-          audioBlob = await ttsElevenLabs(text);
-        }
-        const url = URL.createObjectURL(audioBlob);
-        audioPlayer.src = url;
-        audioSection.classList.remove("hidden");
-        audioPlayer.play();
-        downloadLink.href = url;
+        const response = await puter.chat("Write short pop-style song lyrics with a verse and chorus.");
+        textarea.value = response;
       } catch (err) {
-        alert("❌ TTS error: " + err.message);
+        textarea.value = "❌ Error: " + err.message;
       }
     }
 
-    genBtn.onclick = async () => {
-      const prompt = input.value.trim();
-      if (!prompt) return;
-
-      genBtn.disabled = true;
-      genBtn.textContent = "Generating...";
-      output.classList.add("hidden");
-      audioSection.classList.add("hidden");
-      output.textContent = "";
-
-      const systemPrompt = `
-You are a narrator who tells stories like Reddit Reads or RequestedReads. Write a detailed, suspenseful, emotional or creepy Reddit-style story based on this prompt:
-"${prompt}"
-Make it feel dramatic and spoken. Max 500 words.
-      `.trim();
-
-      try {
-        const result = await client.chat(systemPrompt);
-        lastResponse = result.trim();
-        output.textContent = lastResponse;
-        output.classList.remove("hidden");
-        await speak(lastResponse);
-      } catch (err) {
-        output.textContent = "😵 AI error: " + err.message;
-        output.classList.remove("hidden");
+    function submitToMelobytes() {
+      const lyrics = document.getElementById("lyrics").value;
+      if (!lyrics.trim()) {
+        alert("Please generate or write some lyrics first.");
+        return;
       }
 
-      genBtn.disabled = false;
-      genBtn.textContent = "Generate Story";
-    };
+      // Inject lyrics into form and submit it
+      document.getElementById("melobytesText").value = lyrics;
+      document.getElementById("melobytesForm").submit();
+    }
   </script>
 </body>
 </html>
